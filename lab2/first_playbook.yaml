@@ -1,0 +1,50 @@
+---
+- name: First play
+  hosts: 127.0.0.1
+  become: true
+  tasks:
+  - name: First task
+    ping:
+
+  - name: Show proc list
+    command: "netstat -ntlp"
+    register: abc
+
+  - name: Show output
+    debug:
+      var: abc.stdout_lines
+
+  - name: Create the "sysadmins" user group
+    group:
+      name: sysadmins
+      state: present
+
+  - name: create user for Roman
+    user:
+      name: romankuchin
+      groups: sysadmins
+
+  - name: create user for Juri
+    user:
+      name: hudolejev
+      groups: sysadmins
+
+  - name: place admin ssh key
+    authorized_key:
+      user: paktalin
+      key: https://github.com/korbi-oranssi.keys
+
+  - name: place Roman ssh key
+    authorized_key:
+      user: romankuchin
+      key: https://github.com/romankuchin.keys
+
+  - name: place Juri ssh key
+    authorized_key:
+      user: hudolejev
+      key: https://github.com/hudolejev.keys
+
+  - name: disable sudo pass
+    copy:
+      dest: /etc/sudoers.d/paktalin
+      content: "paktalin      ALL = NOPASSWD: ALL"
