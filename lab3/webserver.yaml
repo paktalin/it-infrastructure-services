@@ -1,0 +1,80 @@
+---
+- name: web server
+  hosts: ubuntu
+  become: true
+  tasks: 
+  - name: ping
+    ping:
+
+  - name: disable sudo pass
+    copy:
+      dest: /etc/sudoers.d/paktalin
+      content: "paktalin      ALL = NOPASSWD: ALL"
+
+  - name: install apache2
+    apt: 
+      name: apache2 
+      state: latest
+      force_apt_get: yes
+
+  - name: verify apache version
+    command: "apache2 -version"
+    register: apache_version
+
+  - name: log apache2 version
+    debug:
+      var: apache_version.stdout_lines
+
+  - name: enable mod_rewrite
+    apache2_module: 
+      name: rewrite
+      state: present
+    notify:
+      - restart apache2
+
+  - name: make apache2 listen on port 8080
+    copy:
+      dest: /etc/apache2/ports.conf
+      src: ports.conf
+    notify:
+      - restart apache2
+
+  - name: virtualhost on port 80
+    copy:
+      dest: /etc/apache2/sites-available/000-default.conf
+      src: 000-default.conf
+    notify:
+      - restart apache2
+
+  - name: virtualhost on port 8080
+    copy:
+      dest: /etc/apache2/sites-enabled/8080-virtualhost.conf
+      src: virtualhost8080.conf
+    notify:
+      - restart apache2
+
+  - name: install PHP apache module
+    apt: 
+      name: libapache2-mod-php 
+      state: latest
+      force_apt_get: yes
+    notify:
+      - restart apache2
+
+  - name: create a directory for php info
+    file:
+      path: /var/www/php-info
+      state: directory
+
+  - name: phpinfo on server
+    copy:
+      dest: /var/www/php-info
+      src: phpinfo.php
+    notify:
+      - restart apache2
+
+  handlers:
+    - name: restart apache2
+      service: 
+        name: apache2 
+        state: restarted
