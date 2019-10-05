@@ -1,0 +1,4 @@
+[web]
+127.0.0.1 ansible_port=2222
+[db1]
+127.0.0.1 ansible_port=2222

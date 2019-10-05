@@ -1,0 +1,139 @@
+---
+- name: wordpress
+  hosts: web
+  become: true
+
+  vars:
+    db_user: paktalin
+    db_name: wordpress_db
+    db_password:  !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          32326565613035303065303766373031316236653434326466366635366331663965333961396231
+          3735316236316466323064633735356139326536306330350a653461396630643433356461376437
+          38643161306535653963653437353362613932643835343435316465306566306435313233636662
+          3837373564613832330a646332663762633966646161616262613032633937656662343362363239
+          3630
+
+  tasks: 
+  - name: ping
+    ping:
+
+  - name: disable sudo pass
+    copy:
+      dest: /etc/sudoers.d/paktalin
+      content: "paktalin      ALL = NOPASSWD: ALL"
+
+  - name: install apache2
+    apt: 
+      name: apache2 
+      state: latest
+      force_apt_get: yes
+      # update_cache: yes
+
+  - name: enable mod_rewrite
+    apache2_module: 
+      name: rewrite
+      state: present
+    notify:
+      - restart apache2
+
+  - name: make apache2 listen on port 8080
+    copy:
+      dest: /etc/apache2/ports.conf
+      src: ports.conf
+    notify:
+      - restart apache2
+
+  - name: virtualhost on port 80
+    copy:
+      dest: /etc/apache2/sites-available/000-default.conf
+      src: 000-default.conf
+    notify:
+      - restart apache2
+
+  - name: virtualhost on port 8080
+    copy:
+      dest: /etc/apache2/sites-enabled/8080-virtualhost.conf
+      src: virtualhost8080.conf
+    notify:
+      - restart apache2
+
+  - name: install PHP apache module
+    apt: 
+      name: libapache2-mod-php 
+      state: latest
+      force_apt_get: yes
+    notify:
+      - restart apache2
+
+  - name: install MySQL php module
+    apt: 
+      name: php-mysql
+      state: latest
+      force_apt_get: yes
+    notify:
+      - restart apache2
+
+  - name: download wordpress
+    get_url:
+      url: https://wordpress.org/latest.tar.gz
+      dest: /wordpress.tar.gz
+
+  - name: unzip wordpress
+    unarchive:
+      src: /wordpress.tar.gz
+      dest: /var/www
+      copy: no
+
+  - name: copy wp-config.php to local
+    template:
+      src: wp-config.php
+      dest: /var/www/wordpress/wp-config.php
+
+  handlers:
+    - name: restart apache2
+      service: 
+        name: apache2 
+        state: restarted
+
+- name: mysql
+  hosts: db1
+  become: yes
+
+  vars:
+    db_user: paktalin
+    db_name: wordpress_db
+    db_password:  !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          32326565613035303065303766373031316236653434326466366635366331663965333961396231
+          3735316236316466323064633735356139326536306330350a653461396630643433356461376437
+          38643161306535653963653437353362613932643835343435316465306566306435313233636662
+          3837373564613832330a646332663762633966646161616262613032633937656662343362363239
+          3630
+
+  tasks:
+  - name: install mysql
+    apt: 
+      name: mysql-server
+      state: latest
+      force_apt_get: yes
+
+  - name: install python mysql modules
+    apt: 
+      name: python3-pymysql
+      state: latest
+      force_apt_get: yes
+
+  - name: create a new database with name 'wordpress_db'
+    mysql_db:
+      name: "{{ db_name }}"
+      state: present
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+
+  - name: create user paktalin
+    mysql_user:
+      name: paktalin
+      password: "{{ db_password }}"
+      priv: '*.*:ALL'
+      state: present
+      login_unix_socket: /var/run/mysqld/mysqld.sock
